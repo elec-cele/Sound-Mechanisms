@@ -22,15 +22,13 @@ namespace Sound
     std::uniform_real_distribution<double> pct(0, 1);
 
     // Common vector functions
-    double mono_abs_max(mono& vec)
-    {
+    double mono_abs_max(mono& vec) {
         double maxval = *max_element(vec.begin(), vec.end());
         double minval = abs(*min_element(vec.begin(), vec.end()));
         return minval > maxval ? minval : maxval;
     }
 
-    void stereo_normalize(stereo& vec)
-    {
+    void stereo_normalize(stereo& vec) {
         for (int k = 0; k < 2; k++) {
             double maxval = mono_abs_max(vec[k]);
             double reciporical = 1.0 / maxval;
@@ -43,15 +41,14 @@ namespace Sound
         }
     }
 
-    void sum_stereo_vectors(stereo& a, stereo& b) //redundant with add_sounds
-    {
+    void sum_stereo_vectors(stereo& a, stereo& b) {
+        // redundant with add_sounds, only works if both inputs are same size
         for (int i = 0; i < 2; i++) {
             transform(a[i].begin(), a[i].end(), b[i].begin(), a[i].begin(), std::plus<double>());
         }
     }
 
-    void scale_stereo(stereo& a, double b)
-    {
+    void scale_stereo(stereo& a, double b) {
         for (int i = 0; i < 2; i++) {
             for (size_t j = 0; j < a[i].size(); j++) {
                 a[i][j] *= b;
@@ -59,8 +56,7 @@ namespace Sound
         }
     }
 
-    stereo empty_sound(int samps = 0)
-    {
+    stereo empty_sound(int samps = 0) {
         stereo vec;
         vec.resize(2);
         vec[0].reserve(samps);
@@ -72,8 +68,7 @@ namespace Sound
         return vec;
     }
 
-    int longest_env(param_table envelopes)
-    {
+    int longest_env(param_table envelopes) {
         int samples = static_cast<int>(envelopes[0][envelopes[0].size() - 1][0]);
         for (size_t i = 1; i < envelopes.size(); i++) {
             int this_samples = static_cast<int>(envelopes[i][envelopes[i].size() - 1][0]);
@@ -85,8 +80,7 @@ namespace Sound
         return samples;
     }
 
-    int longest_contour(contour_table envelopes)
-    {
+    int longest_contour(contour_table envelopes) {
         int samples = static_cast<int>(envelopes[0].total_samples);
         for (size_t i = 1; i < envelopes.size(); i++) {
             int this_samples = static_cast<int>(envelopes[i].total_samples);
@@ -99,8 +93,7 @@ namespace Sound
     }
 
 
-    void add_sounds(stereo& sound_a, stereo& sound_b, int offset_samps)
-    {
+    void add_sounds(stereo& sound_a, stereo& sound_b, int offset_samps) {
         // Adds arbitrary sound_b onto/into sound_a
         for (int i = 0; i < 2; i++) {
             int sound_len_pre = static_cast<int>(sound_a[i].size());

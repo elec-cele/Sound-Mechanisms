@@ -83,7 +83,7 @@ namespace Sound {
             double this_sample;
             double phase = 0;
             for (int i = 0; i < num_samples; i++) {
-                this_sample = last_val + mod_depth * sin(2 * 3.1415962 * phase);
+                this_sample = last_val + mod_depth * sin(6.28318530717959 * phase);
                 phase += mod_freq / this_samp_freq;
                 if (i == 0) {
                     coords.push_back({ total_samples + 1, this_sample });

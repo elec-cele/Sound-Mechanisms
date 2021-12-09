@@ -5,7 +5,6 @@ int main()
 {
     // Example composition - start with a null sound
     stereo composition_space = Sound::empty_sound();
-    //composition_space.reserve(1000000000);
 
     // Create a Crystal, add it to the composition
     mono frequencies = { 100, 1000, 1250 };
