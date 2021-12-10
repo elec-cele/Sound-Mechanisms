@@ -4,7 +4,9 @@
 #include <vector>    // Apache 2.0
 #include <iostream>  // Apache 2.0
 #include <random>    // Apache 2.0
+#include <map>       // Apache 2.0
 #include "contour.h" // GPLv3
+
 
 const extern int sample_rate;
 double two_pi = 6.28318530717959;
@@ -126,6 +128,24 @@ namespace Sound
     // end common vector functions
 
     // Harmony stuff
+    typedef enum class intvls {U, m2, M2, m3, M3, P4, TT, P5, m6, M6, m7, M7};
+    struct Just_Interval_Ratios {
+        double U = 1.0;
+        double m2 = 16 / 15.0;
+        double M2 = 9 / 8.0;
+        double m3 = 6 / 5.0;
+        double M3 = 5 / 4.0;
+        double P4 = 4 / 3.0;
+        double TT = 7 / 5.0;
+        double P5 = 3 / 2.0;
+        double m6 = 8 / 5.0;
+        double M6 = 5 / 3.0;
+        double m7 = 9 / 5.0;
+        double M7 = 15 / 8.0;
+
+    };
+
+    
     mono ints(int num) {
         mono out;
         for (int i = 1; i <= num; i++) {
