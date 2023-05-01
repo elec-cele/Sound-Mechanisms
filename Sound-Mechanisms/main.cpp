@@ -346,7 +346,7 @@ int main()
     Sound::stereo_normalize(composition_space);
     std::string filename = "canada_goose_alpha_cleanedb.wav";
     //Wav::write_stereo_wav(filename, composition_space, 1);
-    Wav::write_stereo_wav_fixed(filename, composition_space, 1);
+    Wav::write_stereo_wav(filename, composition_space, 1);
 
     return 0;
 }
