@@ -5,6 +5,10 @@
 
 # Wav files
 *.wav
+# Local folders
+Sound-Mechanisms/compositions/
+Sound-Mechanisms/safe/
+
 
 # User-specific files
 *.rsuser
@@ -364,3 +368,4 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/Sound-Mechanisms/compositions

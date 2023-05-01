@@ -21,6 +21,9 @@
     <ClInclude Include="contour.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="tunings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -31,5 +34,8 @@
     <Text Include="README.txt">
       <Filter>Resource Files</Filter>
     </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>
