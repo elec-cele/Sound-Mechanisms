@@ -1,113 +1,115 @@
-#include <iostream>
-#include <vector>    // Apache 2.0
-#include <fstream>
+﻿#include <iostream>
+#include <tuple>
+#include "sound.h"
+const extern double two_pi; 
+double deg2rad(double deg) {
+	return fmod(deg * two_pi / 360.0, two_pi);
+}
+double rad2deg(double rad) {
+	return fmod(rad * 360.0 / two_pi, 360.0);
+}
 
-namespace Pendulum {
+//state_vec type holds t, x, y
+typedef std::tuple<double, double, double> triple;
+typedef std::vector<std::tuple<double, double, double>> state_type;
 
-	mono data_log(int samps = 0) {
-		mono vec;
-		vec.reserve(samps);
-		for (size_t k = 0; k < samps; k++) {
-			vec.push_back(0);
-		}
-		return vec;
+struct Pendulum {
+public:
+
+	//x pendulum parameters
+	double l = 1.0;		 // pendulum length
+	double q = 1;		 // quality (higher = less decay)
+	double alpha;	     // attenuation, = -1/q
+	double g = 9.81;
+	double init_x = 0.0; // pendulum initial phase (RADIANS)
+	double init_y = 0.0; // pendulum initial velocity
+
+	state_type state_vec;	// holds {{t, x, y},...} of solution
+
+	double endval = 1e-3;
+
+	Pendulum(
+		double a,
+		double b,
+		double c,
+		double d) {
+		l = a;
+		q = b;
+		init_x = c;
+		init_y = d;
+		alpha = -1.0 / q;
 	}
+	//x = theta, y=velocity
+	double dxdt(double x, double y) { return y; };
+	double dydt(double x, double y) { return (alpha * y) - ((g / l) * sin(x)); };
 
-	coordinates coordinates_log(int samps = 0) {
-		coordinates coords;
-		coords.reserve(samps);
-		for (size_t k = 0; k < samps; k++) {
-			coords.push_back({ 0, 0 });
-		}
-		return coords;
-	}
-
-	int duration = 60;
-	int sim_sample_rate = 48; //nominal 48000/1000
-	double time = 0.0;
-	int num_samps = duration * sim_sample_rate;
-	
-
-	mono log = data_log(num_samps);
-	mono xpos = data_log(num_samps);
-	mono ypos = data_log(num_samps);
-	mono dist = data_log(num_samps);
-
-	coordinates dist_contour = coordinates_log(num_samps);
-	coordinates pan_contour = coordinates_log(num_samps);
-	mono phs;
-
-	void generate_pendulum_data() {
-
-		//https://ximera.osu.edu/ode/main/simplePendulum/simplePendulum
-		const double e = 2.7182818284;
-		const double two_pi = 2 * 3.14159265358;
-
-		double theta_0 = 60; //initial pendulum angle from horizontal
-		double theta = 0.0;
-		double a = 1; //'drag'
-		double l = 50; //pendulum length
-		double g = 9.8; //gravity
-		double z = 0.0001;
-		double b = sqrt(4 * l * g - a * a) / (2 * l);
-		double decay = (-1 * a) / (2 * l);
-		double h0 = 54; // height of top of pendulum above (0,0)
-
-
-
-		const double deg_to_rad = 0.017453;
-
-
-		double phase = 0.0;
-		for (int n = 0; n < num_samps; n++) {
-			double phase_increment = b / sim_sample_rate;
-			double time_increment = 1.0 / sim_sample_rate;
-
-			theta = pow(e, decay * time) * (theta_0 * cos(phase) + z * sin(phase));
-			log[n] = theta;
-
-			phase = fmod((phase + phase_increment), two_pi);
-			time += time_increment;
-
-			xpos[n] = l * sin(deg_to_rad * theta);
-			ypos[n] = h0 - l * cos(deg_to_rad * theta);
-
-
-			dist[n] = sqrt(pow(xpos[n], 2) + pow(ypos[n], 2));
-			int samp_converted = (48000 / sim_sample_rate) * n;
-			//contours for sound.h need to be in form std::vector<std::pair<int, double>> coordinates
-			//where int is the sample rate in the sound.h application, typ 48000
-			dist_contour[n] = { samp_converted, 1 - (dist[n] / (l))  };
-			pan_contour[n] = { samp_converted, xpos[n] / l };
-			phs.push_back(0);
-		}
-		
-	}
-
-
-void generate_pendulum_sound() {
-		stereo composition_space = Sound::empty_sound();
-
-		// idea: for number of samples, use distance and panning to control a basic sine wave
-		//        Arb(contour_table freqs, contour_table pans, contour_table envs, mono phs) {
-		Sound::Contour freq;
-		freq.add_flat_line(duration, 256*1.5);
-		contour_table freq_tbl = { freq };
-		
-		Sound::Contour env(dist_contour);
-		contour_table env_tbl = { env };
-
-		Sound::Contour panc(pan_contour);
-		contour_table pan_tbl = { panc };
-
-		Sound::Arb this_arb(freq_tbl, pan_tbl, env_tbl, phs);
-		Sound::add_sounds(composition_space, this_arb.sound, 0);
-
-		// Normalize the composition audio and write it to a wav file
-		Sound::stereo_normalize(composition_space);
-		std::string filename = "pendulum4.wav";
-		Wav::write_stereo_wav(filename, composition_space, 1);
-	}
 
 };
 
+void state2txt(state_type& st, std::string filename) {
+	std::ofstream textlog(filename + ".txt");
+	for (size_t i = 0; i < st.size(); i++) {
+		textlog << std::get<0>(st[i]) << '\t' << std::get<1>(st[i]) << '\t' << std::get<2>(st[i]) << '\n';
+
+		textlog << std::get<0>(st[i]) << '\t' << std::get<1>(st[i]) << '\t' << std::get<2>(st[i]) << '\n';
+	}
+}
+
+//used for combining data from two pendulums into one file. skips the time column from the second state vec
+// must be equal length
+void states2txt(state_type& st1, state_type& st2, std::string filename, bool header=false) {
+	std::ofstream textlog(filename + ".txt");
+			if (header) {
+			textlog << "time" << '\t' << "pend1 theta" << '\t' << "pend1 vel" << '\t' << "pend2 theta" << '\t' << "pend2 vel" << '\n';
+		}
+	for (size_t i = 0; i < st1.size(); i++) {
+
+		textlog << std::get<0>(st1[i]) << '\t' << std::get<1>(st1[i]) << '\t' << std::get<2>(st1[i]) << '\t' << std::get<1>(st2[i]) << '\t' << std::get<2>(st2[i]) << '\n';
+	}
+}
+
+void record_state(state_type& sv, triple st) {
+	sv.push_back(st);
+}
+
+template <typename T>
+void RK4(T& eqn, double sim_duration, double h, bool cut_at_endval=true) {
+	int num_steps;
+	num_steps = static_cast<int>(sim_duration / h);
+
+	double kx1, kx2, kx3, kx4;
+	double ky1, ky2, ky3, ky4;
+	double t = 0.0;
+	double x = eqn.init_x;
+	double y = eqn.init_y;
+	//eqn.record_state({ t, x, y });
+	record_state(eqn.state_vec, { t, x, y });
+	double hdiv2 = h / 2.0;
+	double hdiv6 = h / 6.0;
+	for (long int n = 0; n < num_steps; n++) {
+
+		kx1 = eqn.dxdt(x, y);
+		ky1 = eqn.dydt(x, y);
+
+		kx2 = eqn.dxdt(x + hdiv2 * kx1, y + hdiv2 * ky1);
+		ky2 = eqn.dydt(x + hdiv2 * kx1, y + hdiv2 * ky1);
+
+		kx3 = eqn.dxdt(x + hdiv2 * kx2, y + hdiv2 * ky2);
+		ky3 = eqn.dydt(x + hdiv2 * kx2, y + hdiv2 * ky2);
+
+		kx4 = eqn.dxdt(x + h * kx3, y + h * ky3);
+		ky4 = eqn.dydt(x + h * kx3, y + h * ky3);
+
+		x += hdiv6 * (kx1 + 2.0 * kx2 + 2.0 * kx3 + kx4);
+		y += hdiv6 * (ky1 + 2.0 * ky2 + 2.0 * ky3 + ky4);
+		t += h;
+
+		record_state(eqn.state_vec, { t, x, y });
+
+		//make this optional?
+		// stop when the result gets adequately small 
+		if (cut_at_endval) {
+			if (abs(x) < eqn.endval && abs(y) < eqn.endval) { return; }
+		}
+	}
+}

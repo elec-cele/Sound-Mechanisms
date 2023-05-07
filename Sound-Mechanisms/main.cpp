@@ -1,31 +1,28 @@
 #include "sound.h"
-#include "keyboard.h"
-#include "canada_goose.h"
-#include <string>
-#include <regex>
-#include <map>
-#include "pendulum.h"
-#include "arbsingle_test.h"
 
+#include "newpendulum.h"
+#include<chrono>
+#include<string>
+auto start = std::chrono::high_resolution_clock::now();
 const int sample_rate = 48000;
 
-std::random_device rdv;
-std::mt19937 mt(rdv());
-
-std::uniform_int_distribution<int> harmonics(3, 25);
-std::uniform_real_distribution<double> pct(0, 1);
-std::uniform_real_distribution<double> freq_range(10, 40);
-std::uniform_real_distribution<double> d_flip(-1, 1);
-
-std::gamma_distribution<double> gamma(2, 1);
-typedef std::vector<std::vector<std::string>> progression;
 
 
 int main()
 {
-	//Pendulum::generate_pendulum_data();
-	//Pendulum::generate_pendulum_sound();
-	ArbSingleTest::testfunc();
+	//l, q, x_0, y_0
+	Pendulum pend1(500.0, 300, deg2rad(-47), 0.0); 
+	Pendulum pend2(500.0, 600, deg2rad(75), 0.02);
 
+	RK4(pend1, 3600, 0.01, false);
+	RK4(pend2, 3600, 0.01, false);
+	states2txt(pend1.state_vec, pend2.state_vec, "data", true);
+
+
+
+
+	auto stop = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+	std::cout << "computation time: " << duration.count() / 1e6 << " seconds" << std::endl;
 	return 0;
 }

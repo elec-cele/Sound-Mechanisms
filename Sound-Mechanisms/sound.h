@@ -10,7 +10,7 @@
 #include <string>
 
 const extern int sample_rate;
-double two_pi = 6.28318530717959;
+const double two_pi = 6.28318530717959;
 //TYPES
 typedef std::vector<double> mono;
 typedef std::vector<mono> stereo;
@@ -58,6 +58,16 @@ namespace Sound
 			}
 		}
 	}
+
+	mono empty_mono(int samps = 0) {
+		mono vec;
+		vec.reserve(samps);
+		for (size_t k = 0; k < samps; k++) {
+			vec.push_back(0);
+		}
+		return vec;
+	}
+
 
 	stereo empty_sound(int samps = 0) {
 		stereo vec;
@@ -324,8 +334,8 @@ namespace Sound
 			// Creates a stereo vector of the sound defined by the crystal parameters
 			mono lengths;
 			for (size_t i = 0; i < frequencies.size(); i++) {
-				int rise_samps = rise_time[i] * sample_rate;
-				int decay_samps = taus[i] * sample_rate / 10.0;
+				int rise_samps = static_cast<int>(rise_time[i] * sample_rate);
+				int decay_samps = static_cast<int>(taus[i] * sample_rate / 10.0);
 				lengths.push_back(rise_samps + decay_samps);
 			}
 
@@ -342,8 +352,8 @@ namespace Sound
 					sound_samp = sin(two_pi * phase);
 					phase = fmod((phase + phase_increment), 1);
 					//=IF(samp<=rise_samps,samp/rise_samps,EXP(-decay_tau*(samp-rise_samps)))
-					int rise_samps = rise_time[i] * sample_rate;
-					int decay_samps = taus[i] * sample_rate / 10.0;
+					int rise_samps = static_cast<int>(rise_time[i] * sample_rate);
+					int decay_samps = static_cast<int>(taus[i] * sample_rate / 10.0);
 					if (n <= rise_samps) {
 						env_samp = n / static_cast<double>(rise_samps);
 					}
@@ -417,6 +427,37 @@ namespace Sound
 			}
 			stereo_normalize(sound);
 		}
+
+
+		void make_arbsingle_doppler(Sound::Contour vel)
+		{
+			// Creates a stereo vector of the sound defined by the ArbSingle parameters, with doppler effect
+			samples = env.total_samples;
+			sound = Sound::empty_sound(samples);
+
+			double phase = phs.interpolate(0);
+			for (int n = 0; n < samples; n++) {
+				double phsmod = fmod((phase + phs.interpolate(n)), 1);
+				double sound_samp = sin(two_pi * phsmod);
+				double this_samp_freq = freq.interpolate(n) + (vel.interpolate(n) / 343.0);
+				phase = fmod((phase + (this_samp_freq / sample_rate)), 1);
+				double env_samp = env.interpolate(n);
+
+				if (env_samp < 1E-5) {
+					sound[0][n] = 0;
+					sound[1][n] = 0;
+				}
+				else if (env_samp != 0) {
+					sound_samp = sound_samp * env_samp;
+					double pan_factor = (pan.interpolate(n) + 1) * two_pi / 8;
+					sound[0][n] = sound_samp * cos(pan_factor);
+					sound[1][n] = sound_samp * sin(pan_factor);
+				}
+			}
+			stereo_normalize(sound);
+		}
+
+
 
 	};
 	// end ArbSingle stuff
@@ -533,7 +574,7 @@ namespace Wav
 		Wav::write_word_little_endian(out_stream, data_size, 4);
 		out_stream.seekp(4);
 
-		int32_t file_size = data_size - 8;
+		int32_t file_size = static_cast<int32_t>(data_size - 8);
 		Wav::write_word_little_endian(out_stream, file_size, 4);
 		out_stream.close();
 		if (auto_play) {

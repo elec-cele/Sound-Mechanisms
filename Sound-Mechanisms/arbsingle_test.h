@@ -13,18 +13,18 @@ namespace ArbSingleTest {
 		Sound::Contour phs;
 		Sound::Contour env;
 
-		freq.add_flat_line(0, 256);
-		freq.ramp_to(5, 1000);
-		pan.add_flat_line(0, -1);
-		pan.ramp_to(5, 1);
+		freq.add_flat_line(0, 512);
+		freq.flat_sine_mod(5, 64, 256);
+		pan.add_flat_line(0, 0);
+		pan.flat_sine_mod(5, 1, 1);
 		phs.add_flat_line(0, 0.5);
-		phs.flat_sine_mod(5, 20, 0.5);
-		env.add_flat_line(5, 1);
+		phs.flat_sine_mod(5, 32, 100);
+		env.trapezoid(0, 1, 1, 3, 1, 0);
 
 
 		Sound::ArbSingle test(freq, pan, phs, env);
 
-		Wav::write_stereo_wav("arbsingletest.wav", test.sound, 1);
+		Wav::write_stereo_wav("arbsingletestb.wav", test.sound, 1);
 	}
 
 };

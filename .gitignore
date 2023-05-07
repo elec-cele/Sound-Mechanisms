@@ -5,6 +5,7 @@
 
 # Wav files
 *.wav
+*.txt
 # Local folders
 Sound-Mechanisms/compositions/
 Sound-Mechanisms/safe/
