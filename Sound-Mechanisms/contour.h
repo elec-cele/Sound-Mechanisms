@@ -1,20 +1,21 @@
 #pragma once
 #include "sound.h"
+#include <vector>
 typedef std::vector<std::pair<int, double>> coordinates;
-
-const extern int sample_rate;
+typedef std::vector<double> mono;
+const extern int SAMPLE_RATE;
 
 namespace Sound {
 
     class Contour {
     public:
-        double total_duration; //units of seconds
-        int total_samples;
-        coordinates coords;
-        double samp_duration = 1 / (sample_rate);
-        double last_val;
-        double slope, intercept, segment_max_samples;
-        int offset;
+        double total_duration = 0.0; //units of seconds
+        int total_samples = 0;
+        coordinates coords = {};
+        double samp_duration = 1 / (SAMPLE_RATE);
+        double last_val = 0.0;
+        double slope, intercept, segment_max_samples = 0.0;
+        int offset = 0;
 
         Contour() {
             total_duration, last_val = 0.0;
@@ -27,6 +28,17 @@ namespace Sound {
             offset = 0;
             solve_segment();
             update_duration();
+        }
+
+        Contour(mono time_vec, mono val_vec) {
+            for (size_t n = 0; n < time_vec.size(); n++) {
+                int time2sample = static_cast<int>(SAMPLE_RATE * time_vec[n]);
+                coords.push_back({ time2sample, val_vec[n] });
+            }
+            offset = 0;
+            solve_segment();
+            update_duration();
+   
         }
 
         void solve_segment(void) {
@@ -57,12 +69,12 @@ namespace Sound {
         void update_duration(void) {
             total_samples = std::get<int>(coords[coords.size() - 1]);
             last_val = std::get<double>(coords[coords.size() - 1]);
-            total_duration = total_samples / static_cast<double>(sample_rate);
+            total_duration = total_samples / static_cast<double>(SAMPLE_RATE);
         }
 
         void add_flat_line(double line_duration, double value) {
             double line_from = std::get<double>(coords[coords.size() - 1]);
-            int duration_samples = static_cast<int>(line_duration * sample_rate);
+            int duration_samples = static_cast<int>(line_duration * SAMPLE_RATE);
             if (line_from != value) {
                 coords.push_back({ total_samples + 1, value });
             }
@@ -71,14 +83,14 @@ namespace Sound {
         }
 
         void ramp_to(double ramp_duration, double ramp_to) {
-            int duration_samples = static_cast<int>(ramp_duration * sample_rate);
+            int duration_samples = static_cast<int>(ramp_duration * SAMPLE_RATE);
             coords.push_back({ total_samples + duration_samples, ramp_to });
             update_duration();
         }
 
         void flat_sine_mod(double duration, double mod_freq, double mod_depth) {
-            int this_samp_freq = sample_rate / 10;  // NOTE: limits modulation bandwidth to 10% of audio bandwidth to save memory.
-            double freq_ratio = sample_rate / (double)this_samp_freq;
+            int this_samp_freq = SAMPLE_RATE / 10;  // NOTE: limits modulation bandwidth to 10% of audio bandwidth to save memory.
+            double freq_ratio = SAMPLE_RATE / (double)this_samp_freq;
             int num_samples = static_cast<int>(this_samp_freq * duration);
             double this_sample;
             double phase = 0;

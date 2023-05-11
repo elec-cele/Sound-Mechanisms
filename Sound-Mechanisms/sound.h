@@ -9,7 +9,7 @@
 #include <sstream>
 #include <string>
 
-const extern int sample_rate;
+const extern int SAMPLE_RATE;
 const double two_pi = 6.28318530717959;
 //TYPES
 typedef std::vector<double> mono;
@@ -68,7 +68,6 @@ namespace Sound
 		return vec;
 	}
 
-
 	stereo empty_sound(int samps = 0) {
 		stereo vec;
 		vec.resize(2);
@@ -88,7 +87,6 @@ namespace Sound
 			if (this_samples > samples) {
 				samples = this_samples;
 			}
-
 		}
 		return samples;
 	}
@@ -104,7 +102,6 @@ namespace Sound
 		}
 		return samples;
 	}
-
 
 	void add_sounds(stereo& sound_a, stereo& sound_b, int offset_samps) {
 		// Adds arbitrary sound_b onto/into sound_a
@@ -136,6 +133,30 @@ namespace Sound
 			}
 		}
 	}
+
+	mono add_monos(mono& v, mono y) {
+		for (size_t n = 0; n < v.size(); n++) {
+			v[n] += y[n];
+		}
+		return v;
+	}
+
+	mono mono_times_scalar(mono& v, double scalar) {
+		for (size_t n = 0; n < v.size(); n++) {
+			v[n] *= scalar;
+		}
+		return v;
+	}
+
+	void add_many_monos_ref(mono& v, std::vector<mono> y) {
+		for (size_t n = 0; n < v.size(); n++) {
+			for (size_t j = 0; j < y[n].size(); j++) {
+				v[n] += y[j][n];
+			}
+		}
+
+	}
+
 	// end common vector functions
 
 	// Harmony stuff
@@ -305,19 +326,19 @@ namespace Sound
 		{
 			// Creates a stereo vector of the sound defined by the crystal parameters
 			int samples = static_cast<int>(
-				*std::max_element(taus.begin(), taus.end()) * sample_rate / 10.0);
+				*std::max_element(taus.begin(), taus.end()) * SAMPLE_RATE / 10.0);
 			stereo this_sound = empty_sound(samples);
 
 			for (size_t i = 0; i < frequencies.size(); i++) {
 				stereo particle = empty_sound(samples);
 				double sound_samp, env_samp, pan_factor = 0.0;
 				double phase = phases[i];
-				double phase_increment = frequencies[i] / sample_rate;
+				double phase_increment = frequencies[i] / SAMPLE_RATE;
 
 				for (int n = 0; n < samples; n++) {
 					sound_samp = sin(two_pi * phase);
 					phase = fmod((phase + phase_increment), 1);
-					env_samp = exp(-n / (0.18 * taus[i] * sample_rate / 10.0));
+					env_samp = exp(-n / (0.18 * taus[i] * SAMPLE_RATE / 10.0));
 					sound_samp = sound_samp * env_samp * intensities[i];
 					pan_factor = (pannings[i] + 1) * two_pi / 8.0;
 					particle[0][n] = (sound_samp * cos(pan_factor));
@@ -334,8 +355,8 @@ namespace Sound
 			// Creates a stereo vector of the sound defined by the crystal parameters
 			mono lengths;
 			for (size_t i = 0; i < frequencies.size(); i++) {
-				int rise_samps = static_cast<int>(rise_time[i] * sample_rate);
-				int decay_samps = static_cast<int>(taus[i] * sample_rate / 10.0);
+				int rise_samps = static_cast<int>(rise_time[i] * SAMPLE_RATE);
+				int decay_samps = static_cast<int>(taus[i] * SAMPLE_RATE / 10.0);
 				lengths.push_back(rise_samps + decay_samps);
 			}
 
@@ -346,23 +367,23 @@ namespace Sound
 				stereo particle = empty_sound(samples);
 				double sound_samp, env_samp, pan_factor = 0.0;
 				double phase = phases[i];
-				double phase_increment = frequencies[i] / sample_rate;
+				double phase_increment = frequencies[i] / SAMPLE_RATE;
 
 				for (int n = 0; n < samples; n++) {
 					sound_samp = sin(two_pi * phase);
 					phase = fmod((phase + phase_increment), 1);
 					//=IF(samp<=rise_samps,samp/rise_samps,EXP(-decay_tau*(samp-rise_samps)))
-					int rise_samps = static_cast<int>(rise_time[i] * sample_rate);
-					int decay_samps = static_cast<int>(taus[i] * sample_rate / 10.0);
+					int rise_samps = static_cast<int>(rise_time[i] * SAMPLE_RATE);
+					int decay_samps = static_cast<int>(taus[i] * SAMPLE_RATE / 10.0);
 					if (n <= rise_samps) {
 						env_samp = n / static_cast<double>(rise_samps);
 					}
 					else {
 						int corrected_samp = n - rise_samps;
-						env_samp = exp(-corrected_samp / (0.18 * taus[i] * sample_rate / 10.0));
+						env_samp = exp(-corrected_samp / (0.18 * taus[i] * SAMPLE_RATE / 10.0));
 					}
 
-					//env_samp = exp(-n / (0.18 * taus[i] * sample_rate / 10.0));
+					//env_samp = exp(-n / (0.18 * taus[i] * SAMPLE_RATE / 10.0));
 					sound_samp = sound_samp * env_samp * intensities[i];
 					pan_factor = (pannings[i] + 1) * two_pi / 8.0;
 					particle[0][n] = (sound_samp * cos(pan_factor));
@@ -408,7 +429,7 @@ namespace Sound
 			for (int n = 0; n < samples; n++) {
 				double phsmod = fmod((phase + phs.interpolate(n)), 1);
 				double sound_samp = sin(two_pi * phsmod);
-				phase = fmod((phase + (freq.interpolate(n) / sample_rate)), 1);
+				phase = fmod((phase + (freq.interpolate(n) / SAMPLE_RATE)), 1);
 
 				//::cout << phsmod << "\n";
 
@@ -440,7 +461,7 @@ namespace Sound
 				double phsmod = fmod((phase + phs.interpolate(n)), 1);
 				double sound_samp = sin(two_pi * phsmod);
 				double this_samp_freq = freq.interpolate(n) + (vel.interpolate(n) / 343.0);
-				phase = fmod((phase + (this_samp_freq / sample_rate)), 1);
+				phase = fmod((phase + (this_samp_freq / SAMPLE_RATE)), 1);
 				double env_samp = env.interpolate(n);
 
 				if (env_samp < 1E-5) {
@@ -494,7 +515,7 @@ namespace Sound
 
 				for (int n = 0; n < samples; n++) {
 					sound_samp = sin(two_pi * phase);
-					phase = fmod((phase + (frequencies[i].interpolate(n) / sample_rate)), 1);
+					phase = fmod((phase + (frequencies[i].interpolate(n) / SAMPLE_RATE)), 1);
 					env_samp = envelopes[i].interpolate(n);
 
 					if (env_samp < 1E-5) {
@@ -536,9 +557,9 @@ namespace Wav
 		short int one = 0b01;
 		short int two = 0b10;
 		short int four = 0b0100;
-		int32_t samp_rate = sample_rate;   // can't reinterpret cast of const
+		int32_t samp_rate = SAMPLE_RATE;   // can't reinterpret cast of const
 		int32_t total_rate = 4 * samp_rate;
-		int32_t bit_rate = sample_rate * 4;
+		int32_t bit_rate = SAMPLE_RATE * 4;
 		constexpr double max_amplitude = 32760;  // for scaling [-1, 1] to [-32760, 32760] PCM format int range
 		std::ofstream out_stream(filename, std::ios::binary);
 
@@ -549,7 +570,7 @@ namespace Wav
 		Wav::write_word_little_endian(out_stream, 16, 4);     // Length of format data
 		Wav::write_word_little_endian(out_stream, 1, 2); // PCM format
 		Wav::write_word_little_endian(out_stream, 2, 2); // Stereo format
-		Wav::write_word_little_endian(out_stream, sample_rate, 4);  // samples per second (Hz)
+		Wav::write_word_little_endian(out_stream, SAMPLE_RATE, 4);  // samples per second (Hz)
 		Wav::write_word_little_endian(out_stream, total_rate, 4); // bit rate
 		Wav::write_word_little_endian(out_stream, 4, 2);    // data block size
 		Wav::write_word_little_endian(out_stream, 16, 2);  // bits per sample

@@ -370,3 +370,5 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /Sound-Mechanisms/compositions
+/Sound-Mechanisms/tp4.bmp
+/Sound-Mechanisms/dualpendulumplot.py
