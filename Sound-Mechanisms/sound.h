@@ -5,9 +5,10 @@
 #include <iostream>  // Apache 2.0
 #include <random>    // Apache 2.0
 #include <map>       // Apache 2.0
-#include "contour.h" // GPLv3
 #include <sstream>
 #include <string>
+#include "contour.h"
+#include "bitmap.h"
 
 const extern int SAMPLE_RATE;
 const double two_pi = 6.28318530717959;
@@ -16,6 +17,8 @@ typedef std::vector<double> mono;
 typedef std::vector<mono> stereo;
 typedef std::vector<stereo> param_table;
 typedef std::vector<Sound::Contour> contour_table;
+typedef std::vector<std::pair<int, double>> coordinates;
+
 
 namespace Sound
 {
@@ -26,17 +29,19 @@ namespace Sound
 
 	// Common vector functions
 	double mono_abs_max(mono& vec) {
-		double maxval = *max_element(vec.begin(), vec.end());
-		double minval = abs(*min_element(vec.begin(), vec.end()));
-		return minval > maxval ? minval : maxval;
-	}
+	double maxval = *max_element(vec.begin(), vec.end());
+	double minval = abs(*min_element(vec.begin(), vec.end()));
+	return minval > maxval ? minval : maxval;
+}
 
-	void stereo_normalize(stereo& vec) {
+
+	void stereo_normalize(stereo& vec, bool normalize_upward = false) {
 		for (int k = 0; k < 2; k++) {
 			double maxval = mono_abs_max(vec[k]);
 			double reciporical = 1.0 / maxval;
-			// (don't normalize sounds that are intentionally less than max volume)
-			if (maxval > 1) {
+			// by default doesn't normalize sounds that are intentionally less than max volume
+			// if normalize_upward true, it does
+			if (maxval > 1 || normalize_upward) {
 				for (size_t i = 0; i < vec[k].size(); i++) {
 					vec[k][i] = vec[k][i] * reciporical;
 				}
@@ -410,13 +415,14 @@ namespace Sound
 		int samples;
 		stereo sound;
 
+
 		ArbSingle(Sound::Contour freq_contour, Sound::Contour pan_contour, Sound::Contour phs_contour, Sound::Contour env_contour)
 		{
 			freq = freq_contour;
 			pan = pan_contour;
 			phs = phs_contour;
 			env = env_contour;
-			make_arbsingle();
+			//make_arbsingle();
 		}
 
 		void make_arbsingle(void)
@@ -449,19 +455,29 @@ namespace Sound
 			stereo_normalize(sound);
 		}
 
-
-		void make_arbsingle_doppler(Sound::Contour vel)
+		void make_arbsingle_wavetable(Bitmap wt)
 		{
-			// Creates a stereo vector of the sound defined by the ArbSingle parameters, with doppler effect
+			// Creates a stereo vector of the sound defined by the ArbSingle parameters
+			// uses wavetable derived from bitmap instead of sine
 			samples = env.total_samples;
 			sound = Sound::empty_sound(samples);
 
 			double phase = phs.interpolate(0);
 			for (int n = 0; n < samples; n++) {
 				double phsmod = fmod((phase + phs.interpolate(n)), 1);
-				double sound_samp = sin(two_pi * phsmod);
-				double this_samp_freq = freq.interpolate(n) + (vel.interpolate(n) / 343.0);
-				phase = fmod((phase + (this_samp_freq / SAMPLE_RATE)), 1);
+
+				//linear interpolation of wavetable samples
+				// probably a much better way to do this
+				double phscalc = wt.width * phsmod;
+				/*int step_before = floor(phscalc);
+				int step_after = (step_before + 1) % wt.width;
+				double samp_before = wt.vert_vals[step_before];
+				double samp_after = wt.vert_vals[step_after];
+				double sound_samp = samp_before * ((step_after - phscalc)) + samp_after*((phscalc-step_before));*/
+				double sound_samp = wt.vert_vals[phscalc];
+				phase = fmod((phase + (freq.interpolate(n) / SAMPLE_RATE)), 1);
+
+
 				double env_samp = env.interpolate(n);
 
 				if (env_samp < 1E-5) {
@@ -477,6 +493,7 @@ namespace Sound
 			}
 			stereo_normalize(sound);
 		}
+
 
 
 
@@ -537,6 +554,9 @@ namespace Sound
 	};
 	//end arb stuff
 }   // end Sound namespace
+
+
+
 
 
 // wav output 

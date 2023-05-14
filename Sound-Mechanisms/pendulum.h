@@ -98,6 +98,8 @@ public:
 
 	mono dtheta_vec, dphi_vec, theta_vec, phi_vec;
 
+
+
 	double endval = 1e-3;
 	SphericalPendulum(double len, mono init_state) {
 		l = len;
@@ -110,9 +112,12 @@ public:
 		double theta = state_vec[2];
 		double phi = state_vec[3];
 
-		double dd_theta = pow(dphi, 2.0) * cos(theta) * sin(theta) - (g / l) * sin(theta);
-		double dd_phi = -2.0 * dtheta * dphi / tan(theta);
-		return { dd_theta, dd_phi, dtheta, dphi };
+
+		//dd_theta, dd_phi
+		return { pow(dphi, 2.0) * cos(theta) * sin(theta) - (g / l) * sin(theta), 
+			-2.0 * dtheta * dphi / tan(theta), 
+			dtheta, 
+			dphi };
 	}
 
 	void states2txt(std::string filename, int down_sample = 1, bool header = false) {
@@ -168,7 +173,6 @@ void RK4(T& p, double sim_duration, double h, int rec_every = 1, bool cut_at_end
 			Sound::mono_times_scalar(k3, twice_hdiv6), 
 			Sound::mono_times_scalar(k4, hdiv6)});
 
-
 		t += h;
 
 		if (cut_at_endval) {
@@ -176,3 +180,8 @@ void RK4(T& p, double sim_duration, double h, int rec_every = 1, bool cut_at_end
 		}
 	}
 }
+
+
+//SphericalPendulum test(100, { Sound::pct(Sound::rd), Sound::pct(Sound::rd), deg2rad(45.0 + Sound::pct(Sound::rd)*45.0), 0.0});
+//RK4(test, 1200, 0.0002, 100, true);
+//test.states2txt("pend2test.txt");

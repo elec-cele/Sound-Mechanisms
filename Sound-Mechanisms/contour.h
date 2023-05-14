@@ -1,5 +1,4 @@
 #pragma once
-#include "sound.h"
 #include <vector>
 typedef std::vector<std::pair<int, double>> coordinates;
 typedef std::vector<double> mono;
