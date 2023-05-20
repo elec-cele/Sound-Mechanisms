@@ -12,19 +12,19 @@ typedef std::vector<double> mono;
 
 std::vector<char> read_bytes(char const* filename)
 {
-    std::ifstream ifs(filename, std::ios::binary | std::ios::ate);
-    std::ifstream::pos_type pos = ifs.tellg();
+	std::ifstream ifs(filename, std::ios::binary | std::ios::ate);
+	std::ifstream::pos_type pos = ifs.tellg();
 
-    if (pos == 0) {
-        return std::vector<char>{};
-    }
+	if (pos == 0) {
+		return std::vector<char>{};
+	}
 
-    std::vector<char>  result(pos);
+	std::vector<char>  result(pos);
 
-    ifs.seekg(0, std::ios::beg);
-    ifs.read(&result[0], pos);
+	ifs.seekg(0, std::ios::beg);
+	ifs.read(&result[0], pos);
 
-    return result;
+	return result;
 }
 
 int32_t BE_bytes_to_int(std::vector<char> bytes) {
@@ -68,10 +68,10 @@ private:
 public:
 
 	signed long int width, height, data_offset;
-	std::vector<std::string> bmp_bin_array;
-	std::vector<char> data;
-
-	std::vector<double> vert_vals;	// average height of pixels in each column, ranged to 0.0-1.0
+	std::vector<std::string> bmp_bin_array = {};
+	std::vector<char> data = {};
+	std::vector<double> vert_vals = {};	// average height of pixels in each column, ranged to 0.0-1.0
+	std::vector<double> quant_verts = {};
 
 	Bitmap(char const* filename) {
 		data = read_bytes(filename);
@@ -83,10 +83,10 @@ public:
 		data_offset = LE_bytes_to_int(offset_bytes);
 	}
 
-	void array_setup() {
+	void array_setup(bool ac = true) {
 		make_array();
 		correct_bg();
-		calc_verticals();
+		calc_verticals(ac);
 	}
 
 	void make_array() {
@@ -137,7 +137,7 @@ public:
 		}
 	}
 
-	void calc_verticals() {
+	void calc_verticals(bool ac = true) {
 		// for each column, check for a 1 on each row
 		// if 1 => +1 to num_vert, +rowindex to sum_vert
 		for (int i = 0; i < width; i++) {
@@ -149,16 +149,20 @@ public:
 					this_sum_vert += j;
 				}
 			}
-			double this_val = this_sum_vert / this_num_vert;
+			double this_val = 0.0;
+			if (this_num_vert > 0) {
+				this_val = this_sum_vert / this_num_vert;
+			}
 			vert_vals.push_back(this_val);
 		}
 
-		//remove DC offset => find average value, subtract from all elements 
-		double DC = std::reduce(vert_vals.begin(), vert_vals.end(), 0.0) / vert_vals.size();
-		for (auto& element : vert_vals)
-			element -= DC;
-
-		// after figuring out basic values, scale them to be -1.0 to +1.0, 
+		if (ac) {
+			//remove DC offset => find average value, subtract from all elements 
+			double DC = std::reduce(vert_vals.begin(), vert_vals.end(), 0.0) / vert_vals.size();
+			for (auto& element : vert_vals)
+				element -= DC;
+		}
+		// after figuring out basic values, normalize
 		double max_val = mono_abs_max(vert_vals);
 		double reciporical = 1.0 / max_val;
 
@@ -178,12 +182,41 @@ public:
 		return minval > maxval ? minval : maxval;
 	}
 
-	coordinates get_coords(void) {
+	coordinates get_coords(int scale = 1, double min_add = 0.0, double mult_by = 1.0) {
 		coordinates x;
 		for (size_t n = 0; n < vert_vals.size(); n++) {
-			x.push_back(std::pair(n, vert_vals[n]));
+			x.push_back(std::pair(scale * n, mult_by * (min_add + vert_vals[n])));
 		}
 		return x;
+	}
+
+
+	coordinates get_quant_coords(int scale = 1) {
+		coordinates x;
+		for (size_t n = 0; n < quant_verts.size(); n++) {
+			x.push_back(std::pair(scale * n, quant_verts[n]));
+		}
+		return x;
+	}
+
+	void quantize(mono quants) {
+		int num_q = static_cast<int>(quants.size());
+		int h = height / num_q;
+		//assuming array setup with ac=false s.t. vert_vals is all positive, 0-1.0
+		// 0.0 is the bottom of the bottom bin, 1.0 is the top of the top bin
+		// each bin is wavetable.height / num_q tall
+		for (size_t n = 0; n < vert_vals.size(); n++) {
+			// go through the vert_vals vector, figure out which vertical bin it should be in
+			double this_val = vert_vals[n] * (height - 1);
+			if (this_val == 0.0) { quant_verts.push_back(0.0); }
+
+			for (int j = 0; j < num_q; j++) {
+				if (this_val > (j * h) && this_val < ((j + 1) * h)) {
+					quant_verts.push_back(quants[j]);
+				}
+			}
+		}
+
 	}
 
 };

@@ -24,8 +24,8 @@ namespace Sound
 {
 	std::random_device rd;
 	std::mt19937 mt(rd());
-	std::uniform_real_distribution<double> d_flip(-1, 1);
-	std::uniform_real_distribution<double> pct(0, 1);
+	std::uniform_real_distribution<double> d_flip(-1.0, 1.0);
+	std::uniform_real_distribution<double> pct(0, 1.0);
 
 	// Common vector functions
 	double mono_abs_max(mono& vec) {
@@ -160,6 +160,27 @@ namespace Sound
 			}
 		}
 
+	}
+
+	void stereo_times_contour(stereo& s, Contour& cont) {
+		// go through 
+		for (size_t i = 0; i < s[0].size(); i++) {
+			s[0][i] *= cont.interpolate(static_cast<int>(i));
+			s[1][i] *= cont.interpolate(static_cast<int>(i));
+		}
+	}
+
+	void stereo_times_stereo(stereo& s, stereo& t) {
+		for (size_t i = 0; i < s[0].size(); i++) {
+			s[0][i] *= t[0][i];
+			s[1][i] *= t[1][i];
+		}
+	}
+	void stereo_times_mono(stereo& s, mono& t) {
+		for (size_t i = 0; i < s[0].size(); i++) {
+			s[0][i] *= t[i];
+			s[1][i] *= t[i];
+		}
 	}
 
 	// end common vector functions
@@ -461,26 +482,25 @@ namespace Sound
 			// uses wavetable derived from bitmap instead of sine
 			samples = env.total_samples;
 			sound = Sound::empty_sound(samples);
-
+			Sound::Contour wtcont(wt.get_coords());
 			double phase = phs.interpolate(0);
 			for (int n = 0; n < samples; n++) {
-				double phsmod = fmod((phase + phs.interpolate(n)), 1);
+				double phsmod = fmod((phase + phs.interpolate(n)), 1.0);
 
 				//linear interpolation of wavetable samples
-				// probably a much better way to do this
-				double phscalc = wt.width * phsmod;
-				/*int step_before = floor(phscalc);
+				double phscalc = (wt.width - 1) * phsmod;
+				int step_before = floor(phscalc);
 				int step_after = (step_before + 1) % wt.width;
 				double samp_before = wt.vert_vals[step_before];
 				double samp_after = wt.vert_vals[step_after];
-				double sound_samp = samp_before * ((step_after - phscalc)) + samp_after*((phscalc-step_before));*/
-				double sound_samp = wt.vert_vals[phscalc];
-				phase = fmod((phase + (freq.interpolate(n) / SAMPLE_RATE)), 1);
+				double sound_samp = samp_before * ((step_after - phscalc)) + samp_after*((phscalc-step_before));
+				//double sound_samp = wt.vert_vals[phscalc];
+				phase = fmod((phase + (freq.interpolate(n) / SAMPLE_RATE)), 1.0);
 
 
 				double env_samp = env.interpolate(n);
 
-				if (env_samp < 1E-5) {
+				if (env_samp < 1E-5 ) {
 					sound[0][n] = 0;
 					sound[1][n] = 0;
 				}
@@ -493,10 +513,6 @@ namespace Sound
 			}
 			stereo_normalize(sound);
 		}
-
-
-
-
 	};
 	// end ArbSingle stuff
 
