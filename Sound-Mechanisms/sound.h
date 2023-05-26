@@ -482,7 +482,7 @@ namespace Sound
 			// uses wavetable derived from bitmap instead of sine
 			samples = env.total_samples;
 			sound = Sound::empty_sound(samples);
-			Sound::Contour wtcont(wt.get_coords());
+			Sound::Contour wtcont(wt.get_raw_coords());
 			double phase = phs.interpolate(0);
 			for (int n = 0; n < samples; n++) {
 				double phsmod = fmod((phase + phs.interpolate(n)), 1.0);

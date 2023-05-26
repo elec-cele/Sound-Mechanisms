@@ -17,6 +17,8 @@ namespace Sound {
 		double last_val = 0.0;
 		double slope, intercept, segment_max_samples = 0.0;
 		int offset = 0;
+		mono interpolated;
+		mono mute;
 
 		Contour() {
 			total_duration, last_val = 0.0;
@@ -42,6 +44,7 @@ namespace Sound {
 
 		}
 
+		// TODO: get rid of this
 		void solve_segment(void) {
 			double slope_num = std::get<double>(coords[offset + 1]) - std::get<double>(coords[offset]);
 			double slope_den = std::get<int>(coords[offset + 1]) - std::get<int>(coords[offset]);
@@ -51,6 +54,8 @@ namespace Sound {
 			offset += 1;
 		}
 
+		//TODO: stop using this.just use interpolate_contour and work from that mono vector.
+		// need to untangle from sound.h and anywhere else it's referenced
 		double interpolate(int x_a) {
 			double y_a = 0.0;
 
@@ -67,6 +72,38 @@ namespace Sound {
 			return y_a;
 		}
 
+		//don't use this either. just use interpolate_contour and work from that mono vector.
+		double interp_single(int x_a) {
+			//linear interpolation of sample x_a within coords
+			if (x_a > total_samples) { return -1.0; };
+
+			bool found = false;
+			int i = 0;
+			while (!found) {
+				int max_next = std::min(total_samples, i + 1);
+				double x_n = static_cast<double>(std::get<int>(coords[i]));
+				double y_n = std::get<double>(coords[i]);
+				if (x_n == x_a) { return y_n; }
+
+				double x_n_next = static_cast<double>(std::get<int>(coords[max_next]));
+
+				if (x_n <= x_a && x_a <= x_n_next) {
+					double y_n_next = std::get<double>(coords[max_next]);
+					double slope_num = y_n_next - y_n;
+					double slope_den = x_n_next - x_n;
+					slope = slope_num / slope_den;
+					intercept = y_n_next - x_n_next * slope;
+
+					return slope * x_a + intercept;
+				}
+
+				else {
+					i++;
+				}
+			}
+		}
+
+
 		void update_duration(void) {
 			total_samples = std::get<int>(coords[coords.size() - 1]);
 			last_val = std::get<double>(coords[coords.size() - 1]);
@@ -80,6 +117,11 @@ namespace Sound {
 				coords.push_back({ total_samples + 1, value });
 			}
 			coords.push_back({ total_samples + duration_samples, value });
+			//int duration_samples = static_cast<int>(line_duration * SAMPLE_RATE);
+			//if (coords.size() > 0) {
+			//	coords.push_back({ total_samples + 1, value });
+			//}
+			//coords.push_back({ total_samples + duration_samples, value });
 			update_duration();
 		}
 
@@ -129,63 +171,56 @@ namespace Sound {
 			ramp_to(fall_time, end_val);
 		}
 
-		mono mute(double ramp_time, double gate = 1E-3) {
-			// idea: return mono to multiply by in addition to separate env coords
-			// same effect but easier to implement
+		mono interpolate_contour() {
+			// fill in the gaps between known (x0,y0), (x1,y1), ... (x_n-1, y_n-1), (x_n, y_n)
+			interpolated.reserve(total_samples);
+			for (size_t i = 0; i < coords.size() - 1; i++) {
+				//solve this segment equation, push back necessary quantity of samples until next segment.
+				int max_next = std::min(total_samples, static_cast<int>(i + 1));
 
-			// if the input is not zero, c samp is average of ramp_samps/2 above and below (total span of ramp_samps)
-			int ramp_samps = static_cast<int>(ramp_time * SAMPLE_RATE);
-			mono c(total_samples, 0.0);
+				int x_n = std::get<int>(coords[i]);
+				double y_n = std::get<double>(coords[i]);
+				int x_n_next = std::get<int>(coords[max_next]);
+				double y_n_next = std::get<double>(coords[max_next]);
 
-			for (size_t i = 0; i < coords.size(); i++) {
-				double this_coords_dbl = std::get<double>(coords[i]);
-				int this_coords_int = std::get<int>(coords[i]);
+				double slope = (y_n_next - y_n) / (x_n_next - x_n);
+				double intercept = y_n_next - x_n_next * slope;
 
-				double sum = 0.0;
-				if (this_coords_dbl > gate) {
-					if (ramp_samps - i < 0) {
-						// if the ramp starts after this time
-						for (int j = 0; j = ramp_samps; j++) {
-							sum += interpolate(j - (ramp_samps / 2));
-						}
-						c[i] = sum;
-					}
+				int samps_in_segment = x_n_next - x_n;
 
+				for (int j = 0; j < samps_in_segment; j++) {
+					interpolated.push_back(slope * (i + j) + intercept);
 				}
-				// also need to add the final coord
-				else if (i == coords.size() - 1) {
-					c[i] = 0.0;
-				}
-				return c;
-
 			}
+			return interpolated;
 		}
 
+		mono mute_contour(double ramp_time, double gate = 1E-3) {
+			if (interpolated.size() == 0) {
+				interpolate_contour();
+			}
+			mute.reserve(total_samples);
+			int k = static_cast<int>(ramp_time * SAMPLE_RATE);
+			double accumulate = interpolated[0];
+			int nmax = total_samples;
 
-		//avgd = []
-		//	k = 50
-		//	i = 0
+			for (int n = 0; n < nmax; n++) {
+				int samps_after = std::min(nmax - n, k);
+				int index_after = n + samps_after;
+				double a = 1.0 / samps_after;
 
-		//	accumulate = data[0]
-		//	accumulate_step = 1 / k
-		//	nmax = len(data)
-		//	for n in data :
-		//if n <= 1e-5 :
-		//	accumulate = 0
-		//	avgd.append(0)
-		//else :
-		//	samps_after = min(nmax - i, k)
-		//	index_after = i + samps_after
-		//	a = 1 / samps_after
-		//	nextsum = a * sum(data[i:index_after])
-		//	if nextsum <= accumulate :
-		//		accumulate = min(1, nextsum)
-		//		avgd.append(accumulate)
-		//	else:
-		//accumulate += a
-		//	avgd.append(min(accumulate, 1))
-
-		//	i += 1
+				if (interpolated[n] == 0.0) {
+					accumulate -= a;
+					if (accumulate < 0) { accumulate = 0; }
+				}
+				else {
+					accumulate += a;
+					if (accumulate > 1) { accumulate = 1; }
+				}
+				mute.push_back(accumulate);
+			}
+			return mute;
+		}
 
 	};
 }

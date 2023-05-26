@@ -67,7 +67,7 @@ private:
 	const int height_offset = 0x16;
 public:
 
-	signed long int width, height, data_offset;
+	int width, height, data_offset;
 	std::vector<std::string> bmp_bin_array = {};
 	std::vector<char> data = {};
 	std::vector<double> vert_vals = {};	// average height of pixels in each column, ranged to 0.0-1.0
@@ -156,24 +156,22 @@ public:
 			vert_vals.push_back(this_val);
 		}
 
+		double max_val = height - 1;
 		if (ac) {
 			//remove DC offset => find average value, subtract from all elements 
+			double max_val = mono_abs_max(vert_vals);
+
 			double DC = std::reduce(vert_vals.begin(), vert_vals.end(), 0.0) / vert_vals.size();
 			for (auto& element : vert_vals)
 				element -= DC;
 		}
-		// after figuring out basic values, normalize
-		double max_val = mono_abs_max(vert_vals);
+		// after figuring out basic values, normalize appropriately
 		double reciporical = 1.0 / max_val;
 
 		for (size_t i = 0; i < vert_vals.size(); i++) {
 			vert_vals[i] = reciporical * vert_vals[i];
 		}
 
-
-		// ensure first and last samples are 0.0
-		//vert_vals[0] = 0.0;
-		//vert_vals[vert_vals.size() - 1] = 0.0;
 	}
 
 	double mono_abs_max(mono& vec) {
@@ -182,14 +180,42 @@ public:
 		return minval > maxval ? minval : maxval;
 	}
 
-	coordinates get_coords(int scale = 1, double min_add = 0.0, double mult_by = 1.0) {
+	coordinates get_raw_coords(int scale = 1) {
 		coordinates x;
 		for (size_t n = 0; n < vert_vals.size(); n++) {
-			x.push_back(std::pair(scale * n, mult_by * (min_add + vert_vals[n])));
+			if (n > 1 && vert_vals[n - 1] == 0.0 && vert_vals[n] > 0.0) {
+				//push back a zero coord before a non-zero coord to minimize ramp time
+				x.push_back(std::pair((scale * n)-1, 0.0));
+			}
+
+			x.push_back(std::pair(scale * n, vert_vals[n]));
+
+			if (n > 1 && n < (width - 1) && vert_vals[n + 1] == 0.0 && vert_vals[n] > 0.0) {
+				//if the next coord is a zero, push back a zero at the next sample to minimize ramp time
+				x.push_back(std::pair((scale * n) + 1, 0.0));
+			}
 		}
 		return x;
 	}
 
+
+	coordinates get_zeroless_scaled_coords(int scale, double freq_min, double freq_max) {
+		coordinates x;
+		double octaves = std::log2(freq_max / freq_min);
+		double nperoct = 1 / octaves;
+		int vvs = static_cast<int>(vert_vals.size());
+		for (int n = 0; n < vvs; n++) {
+			if (n > 0 && vert_vals[n] == 0.0) {
+			//if any y_n is zeroish, make it equal to y_(n-1)
+			// TODO: make gate value an argument - do when fixing freq scale
+				x.push_back(std::pair(scale * n, std::get<double>(x[n - 1])));
+			}
+			else {
+				x.push_back(std::pair(scale * n, freq_min * pow(2, vert_vals[n] / nperoct)));
+			}
+		}
+		return x;
+	}
 
 	coordinates get_quant_coords(int scale = 1) {
 		coordinates x;
